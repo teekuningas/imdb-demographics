@@ -101,34 +101,35 @@ IMDb voters are ~80–85% male. The **Balanced Genders** toggle (default ON) con
 
 ---
 
-## Next Session: Deployment
+## Deployment ✅
 
-The app is static files only — ideal for containerised serving.
+The app is static files only — served via nginx inside a container.
 
-### Planned file structure
+### File structure
 ```
 ├── index.html
 ├── app.js
 ├── worker.js
 ├── i18n.js
 ├── style.css
-├── imdb_dataset/
+├── imdb_dataset/       ← gitignored; downloaded at container build time
 │   ├── movies.csv
 │   └── ratings.csv
 ├── Containerfile
-├── Caddyfile
-├── .github/workflows/build.yml
+├── nginx.conf
+├── .github/workflows/publish-container.yml
 ├── PLAN.md
 └── .gitignore
 ```
 
-### Containerfile (Caddy)
-- Base: `caddy:alpine`
-- Caddyfile: serve on `:8080`, `file_server`, `encode gzip`
-- CSVs baked into the image (they are gitignored but must be `COPY`'d)
+### Containerfile (nginx)
+- Base: `nginx:stable-alpine`
+- Downloads both CSVs from the upstream GitHub repo at build time via `curl`
+- CSVs are baked into the image — self-contained, no runtime dependency on GitHub
+- Serves on port 80 (map with `-p <hostport>:80`)
 
 ### GitHub Actions workflow
-- Trigger: push to `main`
-- Build image with `Containerfile`
-- Push to GitHub Container Registry (`ghcr.io`)
+- Trigger: push to any tag
+- Builds image with `Containerfile`
+- Pushes to GitHub Container Registry (`ghcr.io/<repo>:latest` + tag)
 
