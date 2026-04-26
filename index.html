@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Curated Spectacle: IMDb Demographics</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loading-overlay" class="overlay">
+        <div class="loader">
+            <h2 id="loading-status">Initializing…</h2>
+            <div class="progress-bar-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <p id="loading-details" class="details">Preparing the spectacle…</p>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <h2>Filters</h2>
+
+            <div class="filter-group">
+                <label for="search-input">Title</label>
+                <input type="text" id="search-input" placeholder="e.g. The Matrix">
+            </div>
+
+            <div class="filter-group year-group">
+                <div>
+                    <label for="year-from">Year from</label>
+                    <input type="number" id="year-from" value="1894">
+                </div>
+                <div>
+                    <label for="year-to">Year to</label>
+                    <input type="number" id="year-to">
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Age Group</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="age-group" value="allages" checked> All Ages</label>
+                    <label><input type="radio" name="age-group" value="0age"> &lt; 18</label>
+                    <label><input type="radio" name="age-group" value="18age"> 18 – 29</label>
+                    <label><input type="radio" name="age-group" value="30age"> 30 – 44</label>
+                    <label><input type="radio" name="age-group" value="45age"> 45+</label>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Genres</label>
+                <div id="genres-container" class="checkbox-grid">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Extra filters inserted here by app.js when enabled in Settings -->
+            <div id="extra-filters-area">
+                <div id="extra-filter-director" class="filter-group hidden">
+                    <label for="filter-director">Director</label>
+                    <input type="text" id="filter-director" placeholder="e.g. Kubrick">
+                </div>
+                <div id="extra-filter-country" class="filter-group hidden">
+                    <label for="filter-country">Country</label>
+                    <input type="text" id="filter-country" placeholder="e.g. France">
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button id="apply-filters" class="btn-primary">Apply</button>
+                <button id="reset-filters" class="btn-secondary">Reset</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div class="header-titles">
+                    <h1>The Curated Spectacle</h1>
+                    <p>Exploring cinema through the lens of gender and age demographics.</p>
+                </div>
+                <div class="header-actions">
+                    <span id="results-count" class="results-count">0 results</span>
+                    <button id="settings-btn" class="btn-icon" title="Settings">⚙️ Settings</button>
+                </div>
+            </header>
+
+            <div class="table-container">
+                <table id="movies-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th data-sort="title" class="sortable">Title <span class="sort-icon"></span></th>
+                            <th data-sort="score" class="sortable">Score <span class="sort-icon"></span></th>
+                            <th data-sort="female_avg" class="sortable">♀ Avg <span class="sort-icon"></span></th>
+                            <th data-sort="male_avg" class="sortable">♂ Avg <span class="sort-icon"></span></th>
+                            <th data-sort="gaze_delta" class="sortable">Gaze Δ <span class="sort-icon"></span></th>
+                            <!-- Extra columns appended here by app.js -->
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination">
+                <button id="prev-page" class="btn-secondary" disabled>← Prev</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page" class="btn-secondary" disabled>Next →</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Settings</h2>
+
+            <!-- Gender Balance -->
+            <div class="settings-section">
+                <h3>Gender Balance</h3>
+                <p class="settings-desc">
+                    When <strong>on</strong>, the Score column gives equal weight to female and male ratings:
+                    <code>(♀ + ♂) / 2</code>. When <strong>off</strong>, scores are vote-weighted — reflecting
+                    actual voter proportions (~85% male on IMDb).
+                </p>
+                <label class="toggle-label">
+                    <input type="checkbox" id="balanced-genders" checked>
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    Balanced Genders
+                </label>
+            </div>
+
+            <!-- Display -->
+            <div class="settings-section">
+                <h3>Display</h3>
+                <div class="settings-row">
+                    <label for="gaze-threshold">Gaze Δ highlight threshold</label>
+                    <input type="number" id="gaze-threshold" step="0.1" value="0.5" min="0" max="10">
+                </div>
+                <div class="settings-row">
+                    <label for="page-size">Rows per page</label>
+                    <select id="page-size">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Statistical Significance -->
+            <div class="settings-section">
+                <h3>Significance Filter</h3>
+                <p class="settings-desc">
+                    Minimum votes each gender must have for the selected age group. Lower this to see more
+                    films; raise it for greater statistical confidence.
+                </p>
+                <div class="settings-row">
+                    <label for="min-votes">Min votes per gender</label>
+                    <input type="number" id="min-votes" value="1000" min="0" step="100">
+                </div>
+            </div>
+
+            <!-- Extra Filters -->
+            <div class="settings-section">
+                <h3>Extra Filters</h3>
+                <p class="settings-desc">Add optional filter inputs to the sidebar.</p>
+                <div class="column-toggles">
+                    <label><input type="checkbox" class="extra-filter-toggle" value="director"> Director</label>
+                    <label><input type="checkbox" class="extra-filter-toggle" value="country"> Country</label>
+                </div>
+            </div>
+
+            <!-- Extra Columns -->
+            <div class="settings-section">
+                <h3>Extra Columns</h3>
+                <p class="settings-desc">Add optional columns to the table. IMDb Score is the official Bayesian-smoothed rating — it is <em>not</em> affected by the Gender Balance toggle.</p>
+                <div class="column-toggles">
+                    <label><input type="checkbox" class="col-toggle" value="imdb_score"> IMDb Score</label>
+                    <label><input type="checkbox" class="col-toggle" value="total_votes"> Total Votes</label>
+                    <label><input type="checkbox" class="col-toggle" value="director"> Director</label>
+                    <label><input type="checkbox" class="col-toggle" value="country"> Country</label>
+                    <label><input type="checkbox" class="col-toggle" value="duration"> Duration</label>
+                    <label><input type="checkbox" class="col-toggle" value="metascore"> Metascore</label>
+                    <label><input type="checkbox" class="col-toggle" value="budget"> Budget</label>
+                    <label><input type="checkbox" class="col-toggle" value="usa_gross"> USA Gross</label>
+                    <label><input type="checkbox" class="col-toggle" value="worldwide_gross"> Worldwide Gross</label>
+                </div>
+            </div>
+
+            <button id="save-settings" class="btn-primary btn-full">Save & Apply</button>
+        </div>
+    </div>
+
+    <script src="app.js?v=7"></script>
+</body>
+</html>
