@@ -3,85 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Curated Spectacle: IMDb Demographics</title>
+    <title>The Curated Spectacle</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="loading-overlay" class="overlay">
         <div class="loader">
-            <h2 id="loading-status">Initializing…</h2>
+            <h2 id="loading-status" data-i18n="loading.init"></h2>
             <div class="progress-bar-container">
                 <div id="progress-bar" class="progress-bar"></div>
             </div>
-            <p id="loading-details" class="details">Preparing the spectacle…</p>
+            <p id="loading-details" class="details" data-i18n="loading.prepare"></p>
         </div>
     </div>
 
     <div class="app-container">
         <aside class="sidebar">
-            <h2>Filters</h2>
+            <h2 data-i18n="sidebar.heading"></h2>
 
             <div class="filter-group">
-                <label for="search-input">Title</label>
-                <input type="text" id="search-input" placeholder="e.g. The Matrix">
+                <label for="search-input" data-i18n="filter.title"></label>
+                <input type="search" id="search-input" data-i18n-ph="filter.title.ph">
             </div>
 
             <div class="filter-group year-group">
                 <div>
-                    <label for="year-from">Year from</label>
+                    <label for="year-from" data-i18n="filter.yearFrom"></label>
                     <input type="number" id="year-from" value="1894">
                 </div>
                 <div>
-                    <label for="year-to">Year to</label>
+                    <label for="year-to" data-i18n="filter.yearTo"></label>
                     <input type="number" id="year-to">
                 </div>
             </div>
 
             <div class="filter-group">
-                <label>Age Group</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="age-group" value="allages" checked> All Ages</label>
-                    <label><input type="radio" name="age-group" value="0age"> &lt; 18</label>
-                    <label><input type="radio" name="age-group" value="18age"> 18 – 29</label>
-                    <label><input type="radio" name="age-group" value="30age"> 30 – 44</label>
-                    <label><input type="radio" name="age-group" value="45age"> 45+</label>
+                <label data-i18n="filter.ageGroup"></label>
+                <div id="age-group-container" class="checkbox-grid">
+                    <label><input type="checkbox" name="age-group" value="0age"> <span data-i18n="filter.ageGroup.u18"></span></label>
+                    <label><input type="checkbox" name="age-group" value="18age"> <span data-i18n="filter.ageGroup.18"></span></label>
+                    <label><input type="checkbox" name="age-group" value="30age"> <span data-i18n="filter.ageGroup.30"></span></label>
+                    <label><input type="checkbox" name="age-group" value="45age"> <span data-i18n="filter.ageGroup.45"></span></label>
                 </div>
             </div>
 
             <div class="filter-group">
-                <label>Genres</label>
-                <div id="genres-container" class="checkbox-grid">
-                    <!-- Populated dynamically -->
-                </div>
+                <label data-i18n="filter.genres"></label>
+                <div id="genres-container" class="checkbox-grid"></div>
             </div>
 
-            <!-- Extra filters inserted here by app.js when enabled in Settings -->
             <div id="extra-filters-area">
                 <div id="extra-filter-director" class="filter-group hidden">
-                    <label for="filter-director">Director</label>
-                    <input type="text" id="filter-director" placeholder="e.g. Kubrick">
+                    <label for="filter-director" data-i18n="filter.director"></label>
+                    <input type="text" id="filter-director" data-i18n-ph="filter.director.ph">
                 </div>
                 <div id="extra-filter-country" class="filter-group hidden">
-                    <label for="filter-country">Country</label>
-                    <input type="text" id="filter-country" placeholder="e.g. France">
+                    <label for="filter-country" data-i18n="filter.country"></label>
+                    <input type="text" id="filter-country" data-i18n-ph="filter.country.ph">
+                </div>
+                <div id="extra-filter-language" class="filter-group hidden">
+                    <label for="filter-language" data-i18n="filter.language"></label>
+                    <input type="text" id="filter-language" data-i18n-ph="filter.language.ph">
                 </div>
             </div>
 
             <div class="filter-actions">
-                <button id="apply-filters" class="btn-primary">Apply</button>
-                <button id="reset-filters" class="btn-secondary">Reset</button>
+                <button id="apply-filters" class="btn-primary" type="button" data-i18n="btn.apply"></button>
+                <button id="reset-filters" class="btn-secondary" type="button" data-i18n="btn.reset"></button>
             </div>
         </aside>
 
         <main class="main-content">
             <header class="header">
                 <div class="header-titles">
-                    <h1>The Curated Spectacle</h1>
-                    <p>Exploring cinema through the lens of gender and age demographics.</p>
+                    <h1 data-i18n="app.title"></h1>
+                    <p data-i18n="app.subtitle"></p>
                 </div>
                 <div class="header-actions">
-                    <span id="results-count" class="results-count">0 results</span>
-                    <button id="settings-btn" class="btn-icon" title="Settings">⚙️ Settings</button>
+                    <span id="results-count" class="results-count" aria-live="polite"></span>
+                    <button id="lang-toggle" class="btn-icon" type="button" title="Change language">EN</button>
+                    <button id="settings-btn" class="btn-icon" type="button">⚙️ <span data-i18n="settings.title"></span></button>
                 </div>
             </header>
 
@@ -89,59 +90,49 @@
                 <table id="movies-table">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th data-sort="title" class="sortable">Title <span class="sort-icon"></span></th>
-                            <th data-sort="score" class="sortable">Score <span class="sort-icon"></span></th>
-                            <th data-sort="female_avg" class="sortable">♀ Avg <span class="sort-icon"></span></th>
-                            <th data-sort="male_avg" class="sortable">♂ Avg <span class="sort-icon"></span></th>
-                            <th data-sort="gaze_delta" class="sortable">Gaze Δ <span class="sort-icon"></span></th>
-                            <!-- Extra columns appended here by app.js -->
+                            <th scope="col" data-i18n="col.rank"></th>
+                            <th scope="col" data-sort="title" class="sortable"><span data-i18n="col.title"></span> <span class="sort-icon"></span></th>
+                            <th scope="col" data-sort="score" class="sortable"><span id="score-col-label" data-i18n="col.scoreBalanced"></span> <span class="sort-icon"></span></th>
+                            <th scope="col" data-sort="female_avg" class="sortable"><span data-i18n="col.femaleAvg"></span> <span class="sort-icon"></span></th>
+                            <th scope="col" data-sort="male_avg" class="sortable"><span data-i18n="col.maleAvg"></span> <span class="sort-icon"></span></th>
+                            <th scope="col" data-sort="gaze_delta" class="sortable"><span data-i18n="col.gazeDelta"></span> <span class="sort-icon"></span></th>
                         </tr>
                     </thead>
-                    <tbody id="table-body">
-                        <!-- Populated dynamically -->
-                    </tbody>
+                    <tbody id="table-body"></tbody>
                 </table>
             </div>
 
             <div class="pagination">
-                <button id="prev-page" class="btn-secondary" disabled>← Prev</button>
-                <span id="page-info">Page 1 of 1</span>
-                <button id="next-page" class="btn-secondary" disabled>Next →</button>
+                <button id="prev-page" class="btn-secondary" type="button" disabled data-i18n="page.prev"></button>
+                <span id="page-info"></span>
+                <button id="next-page" class="btn-secondary" type="button" disabled data-i18n="page.next"></button>
             </div>
         </main>
     </div>
 
-    <!-- Settings Modal -->
     <div id="settings-modal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
-            <h2>Settings</h2>
+            <h2 data-i18n="settings.title"></h2>
 
-            <!-- Gender Balance -->
             <div class="settings-section">
-                <h3>Gender Balance</h3>
-                <p class="settings-desc">
-                    When <strong>on</strong>, the Score column gives equal weight to female and male ratings:
-                    <code>(♀ + ♂) / 2</code>. When <strong>off</strong>, scores are vote-weighted — reflecting
-                    actual voter proportions (~85% male on IMDb).
-                </p>
+                <h3 data-i18n="settings.genderBalance"></h3>
+                <p class="settings-desc" data-i18n="settings.genderBalance.desc"></p>
                 <label class="toggle-label">
                     <input type="checkbox" id="balanced-genders" checked>
                     <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                    Balanced Genders
+                    <span data-i18n="settings.balancedGenders"></span>
                 </label>
             </div>
 
-            <!-- Display -->
             <div class="settings-section">
-                <h3>Display</h3>
+                <h3 data-i18n="settings.display"></h3>
                 <div class="settings-row">
-                    <label for="gaze-threshold">Gaze Δ highlight threshold</label>
+                    <label for="gaze-threshold" data-i18n="settings.gazeDeltaThresh"></label>
                     <input type="number" id="gaze-threshold" step="0.1" value="0.5" min="0" max="10">
                 </div>
                 <div class="settings-row">
-                    <label for="page-size">Rows per page</label>
+                    <label for="page-size" data-i18n="settings.rowsPerPage"></label>
                     <select id="page-size">
                         <option value="50">50</option>
                         <option value="100" selected>100</option>
@@ -151,50 +142,47 @@
                 </div>
             </div>
 
-            <!-- Statistical Significance -->
             <div class="settings-section">
-                <h3>Significance Filter</h3>
-                <p class="settings-desc">
-                    Minimum votes each gender must have for the selected age group. Lower this to see more
-                    films; raise it for greater statistical confidence.
-                </p>
+                <h3 data-i18n="settings.significance"></h3>
+                <p class="settings-desc" data-i18n="settings.significance.desc"></p>
                 <div class="settings-row">
-                    <label for="min-votes">Min votes per gender</label>
+                    <label for="min-votes" data-i18n="settings.minVotes"></label>
                     <input type="number" id="min-votes" value="1000" min="0" step="100">
                 </div>
             </div>
 
-            <!-- Extra Filters -->
             <div class="settings-section">
-                <h3>Extra Filters</h3>
-                <p class="settings-desc">Add optional filter inputs to the sidebar.</p>
+                <h3 data-i18n="settings.extraFilters"></h3>
+                <p class="settings-desc" data-i18n="settings.extraFilters.desc"></p>
                 <div class="column-toggles">
-                    <label><input type="checkbox" class="extra-filter-toggle" value="director"> Director</label>
-                    <label><input type="checkbox" class="extra-filter-toggle" value="country"> Country</label>
+                    <label><input type="checkbox" class="extra-filter-toggle" value="director"> <span data-i18n="filter.director"></span></label>
+                    <label><input type="checkbox" class="extra-filter-toggle" value="country"> <span data-i18n="filter.country"></span></label>
+                    <label><input type="checkbox" class="extra-filter-toggle" value="language"> <span data-i18n="filter.language"></span></label>
                 </div>
             </div>
 
-            <!-- Extra Columns -->
             <div class="settings-section">
-                <h3>Extra Columns</h3>
-                <p class="settings-desc">Add optional columns to the table. IMDb Score is the official Bayesian-smoothed rating — it is <em>not</em> affected by the Gender Balance toggle.</p>
+                <h3 data-i18n="settings.extraColumns"></h3>
+                <p class="settings-desc" data-i18n="settings.extraColumns.desc"></p>
                 <div class="column-toggles">
-                    <label><input type="checkbox" class="col-toggle" value="imdb_score"> IMDb Score</label>
-                    <label><input type="checkbox" class="col-toggle" value="total_votes"> Total Votes</label>
-                    <label><input type="checkbox" class="col-toggle" value="director"> Director</label>
-                    <label><input type="checkbox" class="col-toggle" value="country"> Country</label>
-                    <label><input type="checkbox" class="col-toggle" value="duration"> Duration</label>
-                    <label><input type="checkbox" class="col-toggle" value="metascore"> Metascore</label>
-                    <label><input type="checkbox" class="col-toggle" value="budget"> Budget</label>
-                    <label><input type="checkbox" class="col-toggle" value="usa_gross"> USA Gross</label>
-                    <label><input type="checkbox" class="col-toggle" value="worldwide_gross"> Worldwide Gross</label>
+                    <label><input type="checkbox" class="col-toggle" value="imdb_score"> <span data-i18n="col.imdbScore"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="total_votes"> <span data-i18n="col.totalVotes"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="director"> <span data-i18n="col.director"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="country"> <span data-i18n="col.country"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="language"> <span data-i18n="col.language"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="duration"> <span data-i18n="col.duration"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="metascore"> <span data-i18n="col.metascore"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="budget"> <span data-i18n="col.budget"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="usa_gross"> <span data-i18n="col.usaGross"></span></label>
+                    <label><input type="checkbox" class="col-toggle" value="worldwide_gross"> <span data-i18n="col.worldGross"></span></label>
                 </div>
             </div>
 
-            <button id="save-settings" class="btn-primary btn-full">Save & Apply</button>
+            <button id="save-settings" class="btn-primary btn-full" type="button" data-i18n="settings.saveApply"></button>
         </div>
     </div>
 
-    <script src="app.js?v=7"></script>
+    <script src="i18n.js"></script>
+    <script src="app.js?v=9"></script>
 </body>
 </html>

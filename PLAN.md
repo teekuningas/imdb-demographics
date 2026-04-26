@@ -1,157 +1,76 @@
 # The Curated Spectacle — Project Plan
 
-A fast, elegant, client-side Single Page Application for exploring IMDb movie ratings through the lens of gender and age demographics. Runs entirely in the browser with IndexedDB caching. Designed to feel like a premium, curated data explorer — not a raw data dump.
+A fast, elegant, client-side SPA for exploring IMDb movie ratings through the lens of gender and age demographics. Runs entirely in the browser — no backend, no server-side logic. First load fetches and indexes ~85k records into IndexedDB; subsequent loads use the cache.
 
 ---
 
-## Completed Work
+## Current State: Shipped ✅
 
-- **Architecture & Ingestion** — `worker.js` fetches two CSVs via PapaParse in a Web Worker, merges them by `imdb_title_id`, stores ~85k records in `spectacleDB` (IndexedDB). Genre list cached in `spectacle_genres` (localStorage). All fields ingested explicitly (no raw CSV spread).
-- **Core Engine** — Full-table cursor scan with multi-filter pipeline. Reversible column sorting with null-safe comparator. Paginated rendering.
-- **Gender Balance Engine** — Score column is `(♀+♂)/2` when Balanced Genders is ON (default), or vote-weighted `(♀×fv+♂×mv)/(fv+mv)` when OFF.
-- **Settings system** — All settings persisted to `spectacle_settings` in localStorage. Sections: Gender Balance, Display, Significance, Extra Filters, Extra Columns. Loaded on init with defaults for first-time visitors.
-- **Extra Filters / Columns** — Director and Country as optional sidebar filters; 9 optional table columns (IMDb Score, Total Votes, Director, Country, Duration, Metascore, Budget, USA Gross, Worldwide Gross) with USD formatting.
-- **Data model polish** — `budget`, `usa_gross_income`, `worldwide_gross_income` parsed to USD integers. `worlwide_gross_income` CSV typo corrected. `reviews_from_critics/users`, `top1000_voters` not ingested. DB renamed to `spectacleDB` (v7). localStorage keys prefixed `spectacle_`.
-- **Dev cleanup** — Removed legacy Python scripts and test files.
+The app is fully functional. All planned features are implemented.
 
----
+### Architecture
+- **`worker.js`** — Web Worker: fetches `movies.csv` + `ratings.csv` via PapaParse, merges by `imdb_title_id`, stores in `spectacleDB` (IndexedDB v9). Sends progress events back to the main thread.
+- **`app.js`** — All filtering, sorting, rendering, settings, gender balance engine, i18n.
+- **`i18n.js`** — All user-facing strings in English (`en`) and Finnish (`fi`). Accessed via `t(key, vars)` helper.
+- **`index.html` / `style.css`** — App shell, settings modal (toggle switch component), responsive sidebar.
 
-## Data Sources & Column Inventory
-
-### movies.csv (22 columns)
-
-| CSV Column | Ingest? | Notes |
-|---|---|---|
-| `imdb_title_id` | ✅ Key | Primary key, joins with ratings.csv |
-| `title` | ✅ | Fallback if `original_title` is empty |
-| `original_title` | ✅ | Preferred display title |
-| `year` | ✅ | Parsed to int |
-| `date_published` | ❌ | Year is sufficient |
-| `genre` | ✅ | Split on `,` → array; also populates genre filter |
-| `duration` | ✅ | Int, minutes |
-| `country` | ✅ | String (can be multi-country, comma-separated) |
-| `language` | ✅ | Primary language(s); literal `"None"` → `null` on ingestion |
-| `director` | ✅ | String (can be multi-director, comma-separated) |
-| `writer` | ❌ | Too verbose for table display |
-| `production_company` | ❌ | Too verbose |
-| `actors` | ❌ | Too verbose |
-| `description` | ❌ | Too verbose |
-| `avg_vote` | ❌ | Redundant with `weighted_average_vote` from ratings.csv |
-| `votes` | ❌ | Redundant with `total_votes` from ratings.csv |
-| `budget` | ✅ | Parse USD-prefixed values (`"$ 2250"`) to int; null for non-USD or empty (~72% empty, ~8% non-USD) |
-| `usa_gross_income` | ✅ | Parse USD to int |
-| `worlwide_gross_income` | ✅ | Typo in CSV — stored as `worldwide_gross_income`. Parse USD to int |
-| `metascore` | ✅ | Float 0–100; critic consensus score |
-| `reviews_from_users` | ❌ | Just a count (not a score); not separable or useful |
-| `reviews_from_critics` | ❌ | Just a count (not a score); not useful |
-
-### ratings.csv (49 columns)
-
-| CSV Column Group | Ingest? | Notes |
-|---|---|---|
-| `weighted_average_vote` | ✅ | IMDb's proprietary Bayesian smoothed score |
-| `total_votes` | ✅ | Overall popularity proxy |
-| `mean_vote`, `median_vote` | ❌ | Redundant with weighted avg for display |
-| `votes_10` through `votes_1` | ❌ | Vote distribution histogram; not needed |
-| `allgenders_{0age,18age,30age,45age}_{avg_vote,votes}` | ❌ | Includes voters who didn't specify gender — we compute our own combined score from male+female instead |
-| `males_{allages,0age,18age,30age,45age}_{avg_vote,votes}` | ✅ | Core demographic data |
-| `females_{allages,0age,18age,30age,45age}_{avg_vote,votes}` | ✅ | Core demographic data |
-| `top1000_voters_rating`, `top1000_voters_votes` | ❌ | Dropped — emphasis is on gender-aware data, not elite-voter segmentation |
-| `us_voters_rating/votes`, `non_us_voters_rating/votes` | ❌ | Not interesting enough for the use case |
-
-### How the demographic columns work
-
-The CSV uses a naming pattern: `{gender}_{age}_{metric}` where:
-- **gender**: `allgenders`, `males`, `females`
-- **age**: `allages` (no age filter), `0age` (<18), `18age` (18–29), `30age` (30–44), `45age` (45+)
-- **metric**: `avg_vote` (average rating 1–10), `votes` (number of voters)
-
-Note: There is **no** `allgenders_allages` column — the closest equivalents are `total_votes` (count) and `mean_vote`/`weighted_average_vote` (scores). The `allgenders_Xage` columns include voters who didn't specify a gender, so `allgenders_Xage_votes > males_Xage_votes + females_Xage_votes` (gap is typically 1–5% of voters).
-
-Our app deliberately uses only the `males_*` and `females_*` columns because the entire premise is gender-comparative analysis. The `allgenders_*` columns are not needed.
+### Features
+- **Gender Balance Engine** — Score column toggles between equal-weight `(♀+♂)/2` (default) and vote-weighted. Deep UX integration, not just a derived column.
+- **Age group multi-select** — Four checkboxes (<18, 18–29, 30–44, 45+). No selection = all ages (computed as vote-weighted mean across all four groups — no `allages` aggregate column used).
+- **Extra Filters / Columns** — Director, Country, Language as optional sidebar filters; 10 optional table columns.
+- **Settings** — Persisted to `spectacle_settings` in localStorage. Sections: Gender Balance, Display, Significance, Extra Filters, Extra Columns.
+- **i18n** — EN/FI language toggle in the header. Language stored in settings.
+- **Accessibility** — `type="button"` on all buttons, `type="search"` on title input, `aria-live="polite"` on results count, `scope="col"` on table headers, `:focus-visible` keyboard outline.
 
 ---
 
-## Architecture: Filters, Columns & The Gender Balance Engine
+## Data Model
 
-### The Gender Balance Toggle (Core Concept)
+### Ingested from `movies.csv`
 
-IMDb voters are overwhelmingly male (~80–85%). A film's "real" average score is therefore dominated by male opinion. The app offers a **Balanced Genders** toggle (default: ON) that deeply affects the **Score** column:
+| Field | Notes |
+|---|---|
+| `imdb_title_id` | Primary key |
+| `title` / `original_title` | `original_title` preferred |
+| `year` | Int |
+| `genre` | Split → `genres[]` array |
+| `duration` | Int (minutes) |
+| `country` / `language` / `director` | String; CSV `"None"` → `null` |
+| `budget` / `usa_gross_income` / `worldwide_gross_income` | USD-prefixed strings → int; others → `null`. Note: CSV typo `worlwide_gross_income` corrected on ingest. |
+| `metascore` | Float 0–100 |
 
-**Balanced Genders ON (default):**
-```
-Score = (female_avg + male_avg) / 2
-```
-Both genders contribute equally regardless of how many voted. This answers: *"What would the score be if men and women voted in equal numbers?"*
+**Dropped from movies.csv:** `date_published`, `writer`, `actors`, `description`, `avg_vote`, `votes`, `reviews_from_users`, `reviews_from_critics` (counts, not scores).
 
-**Balanced Genders OFF:**
-```
-Score = (female_avg × female_votes + male_avg × male_votes) / (female_votes + male_votes)
-```
-This reflects actual voter proportions — the "real-world" score.
+### Ingested from `ratings.csv`
 
-**Example — Shawshank Redemption (allages):**
-- Male avg: 9.3 (1,392,803 votes, 83.6% of gendered voters)
-- Female avg: 9.2 (274,168 votes, 16.4%)
-- Balanced score: **9.25** | Vote-weighted score: **9.28**
+| Field | Notes |
+|---|---|
+| `weighted_average_vote` | IMDb's Bayesian smoothed score — shown as-is, NOT recomputed |
+| `total_votes` | Overall popularity proxy |
+| `males_{0age,18age,30age,45age}_{avg_vote,votes}` | Core demographic data |
+| `females_{0age,18age,30age,45age}_{avg_vote,votes}` | Core demographic data |
 
-For films with large gender gaps AND skewed voter ratios, the difference is dramatic. The Gaze Delta (`female_avg − male_avg`) is always computed the same way regardless of this toggle.
+**Dropped from ratings.csv:** `allgenders_*` (includes gender-unspecified voters — we compute our own combined scores from male+female only), `allages` variants (computed on-the-fly from the four age groups), `mean_vote`, `median_vote`, histogram columns (`votes_1`–`votes_10`), `top1000_voters_*`, `us_voters_*`, `non_us_voters_*`.
 
-### Filters
+### Age Group Naming
+CSV pattern `{gender}_{age}_{metric}` — age codes: `0age` (<18), `18age` (18–29), `30age` (30–44), `45age` (45+). "All ages" is computed as the vote-weighted mean across these four groups, not from any aggregate column.
 
-**Default visible (sidebar):**
+---
 
-| Filter | UI Element | Behavior |
+## Gender Balance Engine
+
+IMDb voters are ~80–85% male. The **Balanced Genders** toggle (default ON) controls how Score is computed:
+
+| Mode | Formula | Meaning |
 |---|---|---|
-| Title Search | Text input | Substring match on title, case-insensitive |
-| Year Range | Two number inputs (from/to) | Inclusive range filter on year |
-| Age Group | Radio buttons | Selects which demographic columns drive Female/Male Avg. Options: All Ages (`allages`), <18 (`0age`), 18–29 (`18age`), 30–44 (`30age`), 45+ (`45age`) |
-| Genres | Multi-select checkboxes | OR-match: movie must have at least one selected genre |
+| Balanced (default) | `(♀_avg + ♂_avg) / 2` | Equal gender weight regardless of voter counts |
+| Unbalanced | `(♀_avg × ♀_votes + ♂_avg × ♂_votes) / (♀_votes + ♂_votes)` | Reflects actual voter proportions |
 
-**Optional filters (toggle in Settings → Extra Filters):**
+**Gaze Δ** (`♀_avg − ♂_avg`) is always computed the same way, independent of this toggle.
 
-| Filter | UI Element | Behavior |
-|---|---|---|
-| Director | Text input | Substring match on director field |
-| Country | Text input | Substring match on country field |
+**IMDb Score** (`weighted_average_vote`) is IMDb's own Bayesian score — shown as a reference, never recomputed by us.
 
-### Columns
-
-**Default visible:**
-
-| # | Column | Source / Computation |
-|---|---|---|
-| 1 | **#** (Rank) | Row index in current sort order |
-| 2 | **Title (Year) & Genres** | `original_title` or `title`, `year`, `genres` array joined |
-| 3 | **Score** | Computed from balanced/unbalanced toggle + selected age group (see above) |
-| 4 | **♀ Avg** | `females_{age}_avg_vote` with `females_{age}_votes` shown as sub-text |
-| 5 | **♂ Avg** | `males_{age}_avg_vote` with `males_{age}_votes` shown as sub-text |
-| 6 | **Gaze Δ** | `female_avg − male_avg`, color-coded by threshold |
-
-**Optional columns (toggle in Settings → Extra Columns):**
-
-| Column | Source | Format | Affected by Gender Balance toggle? |
-|---|---|---|---|
-| IMDb Score | `weighted_average_vote` | 1 decimal (e.g., `9.3`) | **No** — IMDb's own Bayesian score; the one "real world" reference |
-| Director | `director` | Text | — |
-| Country | `country` | Text | — |
-| Duration | `duration` | Minutes (e.g., `142 min`) | — |
-| Metascore | `metascore` | Integer 0–100 | — |
-| Total Votes | `total_votes` | Locale-formatted (e.g., `2,278,845`) | — |
-| Budget | `budget` | USD formatted (e.g., `$2.3M`) | — |
-| USA Gross | `usa_gross_income` | USD formatted | — |
-| Worldwide Gross | `worldwide_gross_income` | USD formatted | — |
-
-### Settings Modal
-
-| Section | Setting | Default | Description |
-|---|---|---|---|
-| **Gender Balance** | Balanced Genders toggle | ✅ ON | Equal-weight vs vote-weighted score computation |
-| **Display** | Gaze Delta Threshold | 0.5 | Highlight rows where \|Gaze Δ\| exceeds this |
-| | Page Size | 100 | Rows per page (50 / 100 / 200 / 500) |
-| **Significance** | Min Votes per Gender | 1000 | Both male AND female vote counts for the selected age group must meet this threshold for a movie to appear |
-| **Extra Filters** | Checkboxes | None checked | Director, Country |
-| **Extra Columns** | Checkboxes | None checked | IMDb Score, Director, Country, Duration, Metascore, Total Votes, Top 1000 Rating, Budget, USA Gross, Worldwide Gross |
+**Multi-age aggregation:** when multiple age groups are selected, ♀_avg and ♂_avg are computed as vote-weighted means across those groups before applying the balance formula.
 
 ---
 
@@ -159,15 +78,15 @@ For films with large gender gaps AND skewed voter ratios, the difference is dram
 
 ### localStorage (all keys prefixed `spectacle_`)
 
-| Key | Type | Purpose |
-|---|---|---|
-| `spectacle_db_version` | number | Cache-busting; bump to force re-ingestion |
-| `spectacle_genres` | JSON array | Cached sorted genre list |
-| `spectacle_settings` | JSON object | All user settings (see below) |
+| Key | Value |
+|---|---|
+| `spectacle_db_version` | `9` — bump to force full re-ingestion |
+| `spectacle_genres` | JSON string array of all genres (sorted) |
+| `spectacle_settings` | JSON — see below |
 
-**`spectacle_settings` shape:**
 ```json
 {
+  "language": "en",
   "balancedGenders": true,
   "gazeThreshold": 0.5,
   "minVotesPerGender": 1000,
@@ -177,71 +96,39 @@ For films with large gender gaps AND skewed voter ratios, the difference is dram
 }
 ```
 
-### IndexedDB
-
-| Property | Value |
-|---|---|
-| Database name | `spectacleDB` |
-| Store name | `movies` |
-| Key path | `imdb_title_id` |
-| Indexes | `year` |
-
-Each record is a merged object containing all ingested fields from both CSVs.
+### IndexedDB: `spectacleDB` v9
+- Store: `movies`, key: `imdb_title_id`, index: `year`
 
 ---
 
-## Implementation: What Remains
+## Next Session: Deployment
 
-### Phase 4d: Language, "None" Handling, Age Multi-Select
+The app is static files only — ideal for containerised serving.
 
-- **Worker.js**: Add `language` field. Normalise all literal `"None"` strings from CSV to `null` (affects director, country, language).
-- **App.js + HTML**: Add `language` to `EXTRA_FILTER_DEFS` and `EXTRA_COLUMN_DEFS`.
-- **App.js**: Replace age group radio buttons with multi-select checkboxes (like genres). Default: all checked. When specific ages selected, include movies that meet the min-votes threshold for **any** of the selected age groups, and compute Score/♀Avg/♂Avg as a vote-weighted mean across those groups.
-- **App.js**: Bump DB version to 8 to force re-ingestion with `language` field.
-
-### Phase 4e: i18n (English + Finnish)
-
-A single `i18n.js` file holds all user-facing strings:
-
-```js
-export const translations = {
-  en: { 'filter.title': 'Title', 'settings.balancedGenders': 'Balanced Genders', ... },
-  fi: { 'filter.title': 'Elokuvan nimi', 'settings.balancedGenders': 'Tasapainotettu sukupuoli', ... }
-};
+### Planned file structure
+```
+├── index.html
+├── app.js
+├── worker.js
+├── i18n.js
+├── style.css
+├── imdb_dataset/
+│   ├── movies.csv
+│   └── ratings.csv
+├── Containerfile
+├── Caddyfile
+├── .github/workflows/build.yml
+├── PLAN.md
+└── .gitignore
 ```
 
-- HTML elements that have static text get a `data-i18n="key"` attribute.
-- A `t(key)` helper in `app.js` returns the string for the active locale.
-- A language toggle button (e.g. `EN / FI`) in the header switches locale and re-renders all strings.
-- Active language stored in `spectacle_settings.language` (default `'en'`).
-- Worker.js does not need i18n (no user-facing output).
+### Containerfile (Caddy)
+- Base: `caddy:alpine`
+- Caddyfile: serve on `:8080`, `file_server`, `encode gzip`
+- CSVs baked into the image (they are gitignored but must be `COPY`'d)
 
-### Phase 4f: Code Quality Pass
+### GitHub Actions workflow
+- Trigger: push to `main`
+- Build image with `Containerfile`
+- Push to GitHub Container Registry (`ghcr.io`)
 
-- Strip all redundant comments — code should be self-documenting.
-- Consistent naming throughout (camelCase JS, kebab-case CSS, data-kebab HTML attributes).
-- No `console.log` in non-error paths.
-- CSS: remove any dead rules, ensure variable usage is consistent.
-- HTML: semantic structure, proper `lang` attribute updated on locale switch.
-
-### Phase 5: Deployment (Future Session)
-
-- **Containerfile**: `caddy:alpine` serving static files with gzip.
-- **Caddyfile**: Minimal config for `:8080`, `file_server`, `encode gzip`.
-- **GitHub Actions workflow**: Build image, push to GHCR.
-- File structure will be:
-  ```
-  ├── index.html
-  ├── app.js
-  ├── worker.js
-  ├── i18n.js
-  ├── style.css
-  ├── imdb_dataset/
-  │   ├── movies.csv
-  │   └── ratings.csv
-  ├── Containerfile
-  ├── Caddyfile
-  ├── .github/workflows/build.yml
-  ├── PLAN.md
-  └── .gitignore
-  ```

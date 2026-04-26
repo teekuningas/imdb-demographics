@@ -2,70 +2,68 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- Constants ---
     const DB_NAME = 'spectacleDB';
-    const EXPECTED_DB_VERSION = 7;
+    const EXPECTED_DB_VERSION = 9;
     const LS_VERSION_KEY  = 'spectacle_db_version';
     const LS_GENRES_KEY   = 'spectacle_genres';
     const LS_SETTINGS_KEY = 'spectacle_settings';
 
     const DEFAULT_SETTINGS = {
+        language: 'en',
         balancedGenders: true,
         gazeThreshold: 0.5,
         minVotesPerGender: 1000,
         pageSize: 100,
-        extraFilters: [],   // e.g. ['director', 'country']
-        extraColumns: []    // e.g. ['imdb_score', 'director', ...]
+        extraFilters: [],
+        extraColumns: [],
     };
 
-    // All supported optional columns with display metadata
     const EXTRA_COLUMN_DEFS = [
-        { id: 'imdb_score',         label: 'IMDb Score',       key: 'weighted_average_vote', fmt: 'decimal1' },
-        { id: 'total_votes',        label: 'Total Votes',      key: 'total_votes',           fmt: 'votes' },
-        { id: 'director',           label: 'Director',         key: 'director',              fmt: 'text' },
-        { id: 'country',            label: 'Country',          key: 'country',               fmt: 'text' },
-        { id: 'duration',           label: 'Duration',         key: 'duration',              fmt: 'duration' },
-        { id: 'metascore',          label: 'Metascore',        key: 'metascore',             fmt: 'integer' },
-        { id: 'budget',             label: 'Budget',           key: 'budget',                fmt: 'usd' },
-        { id: 'usa_gross',          label: 'USA Gross',        key: 'usa_gross_income',      fmt: 'usd' },
-        { id: 'worldwide_gross',    label: 'Worldwide Gross',  key: 'worldwide_gross_income',fmt: 'usd' },
+        { id: 'imdb_score',      labelKey: 'col.imdbScore',  key: 'weighted_average_vote', fmt: 'decimal1' },
+        { id: 'total_votes',     labelKey: 'col.totalVotes', key: 'total_votes',           fmt: 'votes'    },
+        { id: 'director',        labelKey: 'col.director',   key: 'director',              fmt: 'text'     },
+        { id: 'country',         labelKey: 'col.country',    key: 'country',               fmt: 'text'     },
+        { id: 'language',        labelKey: 'col.language',   key: 'language',              fmt: 'text'     },
+        { id: 'duration',        labelKey: 'col.duration',   key: 'duration',              fmt: 'duration' },
+        { id: 'metascore',       labelKey: 'col.metascore',  key: 'metascore',             fmt: 'integer'  },
+        { id: 'budget',          labelKey: 'col.budget',     key: 'budget',                fmt: 'usd'      },
+        { id: 'usa_gross',       labelKey: 'col.usaGross',   key: 'usa_gross_income',      fmt: 'usd'      },
+        { id: 'worldwide_gross', labelKey: 'col.worldGross', key: 'worldwide_gross_income',fmt: 'usd'      },
     ];
 
     const EXTRA_FILTER_DEFS = [
-        { id: 'director', label: 'Director',  inputId: 'filter-director' },
-        { id: 'country',  label: 'Country',   inputId: 'filter-country'  },
+        { id: 'director', inputId: 'filter-director' },
+        { id: 'country',  inputId: 'filter-country'  },
+        { id: 'language', inputId: 'filter-language' },
     ];
 
-    // --- UI Elements ---
     const ui = {
-        overlay:    document.getElementById('loading-overlay'),
-        status:     document.getElementById('loading-status'),
-        details:    document.getElementById('loading-details'),
-        progressBar:document.getElementById('progress-bar'),
+        overlay:     document.getElementById('loading-overlay'),
+        status:      document.getElementById('loading-status'),
+        details:     document.getElementById('loading-details'),
+        progressBar: document.getElementById('progress-bar'),
 
-        genresContainer: document.getElementById('genres-container'),
-        searchInput:     document.getElementById('search-input'),
-        yearFromInput:   document.getElementById('year-from'),
-        yearToInput:     document.getElementById('year-to'),
-        ageRadios:       document.getElementsByName('age-group'),
-        extraFiltersArea:document.getElementById('extra-filters-area'),
-        applyBtn:        document.getElementById('apply-filters'),
-        resetBtn:        document.getElementById('reset-filters'),
+        genresContainer:  document.getElementById('genres-container'),
+        searchInput:      document.getElementById('search-input'),
+        yearFromInput:    document.getElementById('year-from'),
+        yearToInput:      document.getElementById('year-to'),
+        applyBtn:         document.getElementById('apply-filters'),
+        resetBtn:         document.getElementById('reset-filters'),
 
         tableBody:    document.getElementById('table-body'),
         resultsCount: document.getElementById('results-count'),
-        sortHeaders:  document.querySelectorAll('th.sortable'),
+        scoreColLabel:document.getElementById('score-col-label'),
 
-        prevPageBtn: document.getElementById('prev-page'),
-        nextPageBtn: document.getElementById('next-page'),
-        pageInfo:    document.getElementById('page-info'),
+        prevPageBtn:  document.getElementById('prev-page'),
+        nextPageBtn:  document.getElementById('next-page'),
+        pageInfo:     document.getElementById('page-info'),
 
+        langToggle:    document.getElementById('lang-toggle'),
         settingsBtn:   document.getElementById('settings-btn'),
         settingsModal: document.getElementById('settings-modal'),
         closeModal:    document.querySelector('.close-modal'),
         saveSettingsBtn: document.getElementById('save-settings'),
 
-        // Settings inputs
         balancedGendersToggle: document.getElementById('balanced-genders'),
         gazeThresholdInput:    document.getElementById('gaze-threshold'),
         minVotesInput:         document.getElementById('min-votes'),
@@ -74,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
         colToggles:            document.querySelectorAll('.col-toggle'),
     };
 
-    // --- State ---
     const state = {
         db: null,
         genres: [],
@@ -82,21 +79,35 @@ document.addEventListener('DOMContentLoaded', () => {
         page: 1,
         sortCol: 'score',
         sortDesc: true,
-
         filters: {
-            search: '',
-            yearFrom: 1894,
-            yearTo: new Date().getFullYear(),
-            ageGroup: 'allages',
+            search: '', yearFrom: 1894, yearTo: new Date().getFullYear(),
+            ageGroups: [],
             genres: [],
-            director: '',
-            country: '',
+            director: '', country: '', language: '',
         },
-
         settings: { ...DEFAULT_SETTINGS },
     };
 
-    // --- Formatting Helpers ---
+    // --- i18n ---
+    function t(key, vars = {}) {
+        const lang = state.settings.language;
+        let str = (translations[lang] && translations[lang][key]) || translations.en[key] || key;
+        for (const [k, v] of Object.entries(vars)) str = str.replace(`{${k}}`, v);
+        return str;
+    }
+
+    function applyI18n() {
+        document.documentElement.lang = state.settings.language;
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.textContent = t(el.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+            el.placeholder = t(el.dataset.i18nPh);
+        });
+        ui.langToggle.textContent = state.settings.language === 'en' ? 'FI' : 'EN';
+    }
+
+    // --- Formatting ---
     function fmtUSD(val) {
         if (val === null || val === undefined) return '—';
         if (val >= 1_000_000_000) return `$${(val / 1_000_000_000).toFixed(1)}B`;
@@ -108,13 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function fmtCell(val, fmt) {
         if (val === null || val === undefined || val === '') return '—';
         switch (fmt) {
-            case 'decimal1':  return Number(val).toFixed(1);
-            case 'integer':   return Math.round(val);
-            case 'votes':     return Number(val).toLocaleString();
-            case 'duration':  return `${val} min`;
-            case 'usd':       return fmtUSD(val);
-            case 'text':      return val;
-            default:          return val;
+            case 'decimal1': return Number(val).toFixed(1);
+            case 'integer':  return Math.round(val);
+            case 'votes':    return Number(val).toLocaleString();
+            case 'duration': return `${val} min`;
+            case 'usd':      return fmtUSD(val);
+            default:         return val;
         }
     }
 
@@ -122,12 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadSettings() {
         try {
             const stored = localStorage.getItem(LS_SETTINGS_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                // Merge with defaults so new keys always get their default value
-                state.settings = { ...DEFAULT_SETTINGS, ...parsed };
-            }
-        } catch (e) {
+            if (stored) state.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+        } catch (_) {
             state.settings = { ...DEFAULT_SETTINGS };
         }
     }
@@ -141,46 +147,38 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.gazeThresholdInput.value      = state.settings.gazeThreshold;
         ui.minVotesInput.value           = state.settings.minVotesPerGender;
         ui.pageSizeSelect.value          = state.settings.pageSize;
-
-        ui.extraFilterToggles.forEach(cb => {
-            cb.checked = state.settings.extraFilters.includes(cb.value);
-        });
-        ui.colToggles.forEach(cb => {
-            cb.checked = state.settings.extraColumns.includes(cb.value);
-        });
-
+        ui.extraFilterToggles.forEach(cb => { cb.checked = state.settings.extraFilters.includes(cb.value); });
+        ui.colToggles.forEach(cb => { cb.checked = state.settings.extraColumns.includes(cb.value); });
         updateExtraFilterVisibility();
     }
 
     function readSettingsFromUI() {
-        state.settings.balancedGenders    = ui.balancedGendersToggle.checked;
-        state.settings.gazeThreshold      = parseFloat(ui.gazeThresholdInput.value) || 0.5;
-        state.settings.minVotesPerGender  = parseInt(ui.minVotesInput.value) || 0;
-        state.settings.pageSize           = parseInt(ui.pageSizeSelect.value) || 100;
-        state.settings.extraFilters       = Array.from(ui.extraFilterToggles).filter(cb => cb.checked).map(cb => cb.value);
-        state.settings.extraColumns       = Array.from(ui.colToggles).filter(cb => cb.checked).map(cb => cb.value);
+        state.settings.balancedGenders   = ui.balancedGendersToggle.checked;
+        state.settings.gazeThreshold     = parseFloat(ui.gazeThresholdInput.value) || 0.5;
+        state.settings.minVotesPerGender = parseInt(ui.minVotesInput.value) || 0;
+        state.settings.pageSize          = parseInt(ui.pageSizeSelect.value) || 100;
+        state.settings.extraFilters      = Array.from(ui.extraFilterToggles).filter(cb => cb.checked).map(cb => cb.value);
+        state.settings.extraColumns      = Array.from(ui.colToggles).filter(cb => cb.checked).map(cb => cb.value);
     }
 
     function updateExtraFilterVisibility() {
         EXTRA_FILTER_DEFS.forEach(def => {
             const wrapper = document.getElementById(`extra-filter-${def.id}`);
-            if (wrapper) {
-                const isEnabled = state.settings.extraFilters.includes(def.id);
-                wrapper.classList.toggle('hidden', !isEnabled);
-                if (!isEnabled) {
-                    const input = document.getElementById(def.inputId);
-                    if (input) input.value = '';
-                }
+            if (!wrapper) return;
+            const active = state.settings.extraFilters.includes(def.id);
+            wrapper.classList.toggle('hidden', !active);
+            if (!active) {
+                const input = document.getElementById(def.inputId);
+                if (input) input.value = '';
             }
         });
     }
 
-    // --- Initialization & Worker Setup ---
+    // --- Initialisation ---
     async function init() {
         loadSettings();
-
-        // Set year-to default to current year
         ui.yearToInput.value = new Date().getFullYear();
+        applyI18n();
 
         if (!window.Worker) {
             ui.status.textContent = 'Error: Web Workers not supported.';
@@ -191,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const storedGenres  = localStorage.getItem(LS_GENRES_KEY);
 
         if (storedVersion == EXPECTED_DB_VERSION && storedGenres) {
-            ui.details.textContent = 'Verifying cache...';
+            ui.details.textContent = t('loading.verify');
             try {
                 const db = await openIndexedDB();
                 if (db) {
@@ -203,14 +201,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     bindEvents();
                     return;
                 }
-            } catch (e) {
-                console.warn('Cache load failed, redownloading...', e);
-            }
+            } catch (_) {}
         }
 
-        // First load — download & process CSVs
-        ui.details.textContent = 'Downloading data (this will be cached for future visits)...';
-        const worker = new Worker('worker.js?v=7');
+        ui.details.textContent = t('loading.download');
+        const worker = new Worker('worker.js?v=9');
 
         worker.onmessage = async (e) => {
             const msg = e.data;
@@ -218,21 +213,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.details.textContent = msg.status;
                 ui.progressBar.style.width = `${msg.percent}%`;
             } else if (msg.type === 'done') {
-                ui.details.textContent = `Ready. Indexed ${msg.totalRecords.toLocaleString()} movies.`;
+                ui.details.textContent = t('loading.done', { n: msg.totalRecords.toLocaleString() });
                 ui.progressBar.style.width = '100%';
-
                 state.genres = msg.genres;
                 localStorage.setItem(LS_VERSION_KEY, EXPECTED_DB_VERSION);
                 localStorage.setItem(LS_GENRES_KEY, JSON.stringify(msg.genres));
-
                 populateGenres();
                 applySettingsToUI();
                 await openIndexedDB();
                 await applyFiltersAndFetch();
-
                 setTimeout(() => ui.overlay.classList.add('hidden'), 500);
             } else if (msg.type === 'error') {
-                ui.status.textContent = 'Initialization Failed';
+                ui.status.textContent = 'Error';
                 ui.details.textContent = msg.message;
                 ui.progressBar.style.backgroundColor = '#e84118';
             }
@@ -242,23 +234,19 @@ document.addEventListener('DOMContentLoaded', () => {
         bindEvents();
     }
 
-    // --- IndexedDB Access ---
+    // --- IndexedDB ---
     function openIndexedDB() {
         return new Promise((resolve) => {
-            const request = indexedDB.open(DB_NAME);
-            request.onsuccess = (event) => {
-                const db = event.target.result;
+            const req = indexedDB.open(DB_NAME);
+            req.onsuccess = (e) => {
+                const db = e.target.result;
                 if (!db.objectStoreNames.contains('movies')) { resolve(null); return; }
-                const tx = db.transaction(['movies'], 'readonly');
-                const store = tx.objectStore('movies');
-                const countReq = store.count();
-                countReq.onsuccess = () => {
-                    if (countReq.result > 0) { state.db = db; resolve(db); }
-                    else resolve(null);
-                };
-                countReq.onerror = () => resolve(null);
+                const store = db.transaction(['movies'], 'readonly').objectStore('movies');
+                const count = store.count();
+                count.onsuccess = () => { if (count.result > 0) { state.db = db; resolve(db); } else resolve(null); };
+                count.onerror = () => resolve(null);
             };
-            request.onerror = () => resolve(null);
+            req.onerror = () => resolve(null);
         });
     }
 
@@ -272,37 +260,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Score Computation (Gender Balance Engine) ---
+    // --- Gender Balance Score ---
     function computeScore(fAvg, fVotes, mAvg, mVotes) {
-        if (state.settings.balancedGenders) {
-            // Equal-weight: treats both genders as equally important
-            return (fAvg + mAvg) / 2;
-        } else {
-            // Vote-weighted: reflects actual voter proportions
-            const total = fVotes + mVotes;
-            return total > 0 ? (fAvg * fVotes + mAvg * mVotes) / total : (fAvg + mAvg) / 2;
-        }
+        if (state.settings.balancedGenders) return (fAvg + mAvg) / 2;
+        const total = fVotes + mVotes;
+        return total > 0 ? (fAvg * fVotes + mAvg * mVotes) / total : (fAvg + mAvg) / 2;
     }
 
-    // --- Filter & Fetch ---
+    // --- Multi-Age Group Aggregation ---
+    // Given a movie record and a list of age group suffixes, compute the vote-weighted
+    // aggregate female avg, male avg, and their respective vote counts across those groups.
+    function aggregateDemographics(movie, ageGroups) {
+        let fWeightedSum = 0, fTotalVotes = 0;
+        let mWeightedSum = 0, mTotalVotes = 0;
+
+        for (const age of ageGroups) {
+            const fAvg   = movie[`females_${age}_avg_vote`];
+            const fVotes = movie[`females_${age}_votes`] || 0;
+            const mAvg   = movie[`males_${age}_avg_vote`];
+            const mVotes = movie[`males_${age}_votes`] || 0;
+
+            if (fAvg && fVotes) { fWeightedSum += fAvg * fVotes; fTotalVotes += fVotes; }
+            if (mAvg && mVotes) { mWeightedSum += mAvg * mVotes; mTotalVotes += mVotes; }
+        }
+
+        return {
+            fAvg:   fTotalVotes > 0 ? fWeightedSum / fTotalVotes : null,
+            fVotes: fTotalVotes,
+            mAvg:   mTotalVotes > 0 ? mWeightedSum / mTotalVotes : null,
+            mVotes: mTotalVotes,
+        };
+    }
+
+    // --- Filters ---
     function readFiltersFromUI() {
-        state.filters.search  = ui.searchInput.value.toLowerCase().trim();
+        state.filters.search   = ui.searchInput.value.toLowerCase().trim();
         state.filters.yearFrom = parseInt(ui.yearFromInput.value) || 0;
         state.filters.yearTo   = parseInt(ui.yearToInput.value) || 9999;
+        state.filters.genres   = Array.from(document.querySelectorAll('.genre-cb:checked')).map(cb => cb.value);
 
-        let selectedAge = 'allages';
-        for (const radio of ui.ageRadios) {
-            if (radio.checked) { selectedAge = radio.value; break; }
-        }
-        state.filters.ageGroup = selectedAge;
+        const checkedAges = Array.from(document.querySelectorAll('input[name="age-group"]:checked')).map(cb => cb.value);
+        state.filters.ageGroups = checkedAges.length > 0 ? checkedAges : ['0age', '18age', '30age', '45age'];
 
-        state.filters.genres = Array.from(document.querySelectorAll('.genre-cb:checked')).map(cb => cb.value);
-
-        // Extra filters (only active if enabled in settings)
-        const dirInput = document.getElementById('filter-director');
-        const cntInput = document.getElementById('filter-country');
-        state.filters.director = dirInput ? dirInput.value.toLowerCase().trim() : '';
-        state.filters.country  = cntInput ? cntInput.value.toLowerCase().trim() : '';
+        const dirInput  = document.getElementById('filter-director');
+        const cntInput  = document.getElementById('filter-country');
+        const langInput = document.getElementById('filter-language');
+        state.filters.director = dirInput  ? dirInput.value.toLowerCase().trim()  : '';
+        state.filters.country  = cntInput  ? cntInput.value.toLowerCase().trim()  : '';
+        state.filters.language = langInput ? langInput.value.toLowerCase().trim() : '';
     }
 
     async function applyFiltersAndFetch() {
@@ -310,112 +315,95 @@ document.addEventListener('DOMContentLoaded', () => {
         state.page = 1;
 
         const colspan = 6 + state.settings.extraColumns.length;
-        ui.tableBody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:30px;color:var(--text-muted)">Filtering…</td></tr>`;
+        ui.tableBody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state" style="padding:20px">…</td></tr>`;
 
         return new Promise((resolve) => {
             setTimeout(() => {
-                const transaction = state.db.transaction(['movies'], 'readonly');
-                const store = transaction.objectStore('movies');
+                const store   = state.db.transaction(['movies'], 'readonly').objectStore('movies');
                 const request = store.openCursor();
-
                 const results = [];
-                const f = state.filters;
+                const f    = state.filters;
                 const minV = state.settings.minVotesPerGender;
-
-                const fAvgKey   = `females_${f.ageGroup}_avg_vote`;
-                const mAvgKey   = `males_${f.ageGroup}_avg_vote`;
-                const fVotesKey = `females_${f.ageGroup}_votes`;
-                const mVotesKey = `males_${f.ageGroup}_votes`;
 
                 request.onsuccess = (event) => {
                     const cursor = event.target.result;
-                    if (cursor) {
-                        const m = cursor.value;
-
-                        const fVotes = m[fVotesKey] || 0;
-                        const mVotes = m[mVotesKey] || 0;
-
-                        if (fVotes >= minV && mVotes >= minV) {
-                            const yearOk  = m.year && m.year >= f.yearFrom && m.year <= f.yearTo;
-                            const titleOk = !f.search   || (m.title || '').toLowerCase().includes(f.search);
-                            const genreOk = f.genres.length === 0 || f.genres.some(g => m.genres.includes(g));
-                            const dirOk   = !f.director || (m.director || '').toLowerCase().includes(f.director);
-                            const cntOk   = !f.country  || (m.country  || '').toLowerCase().includes(f.country);
-
-                            if (yearOk && titleOk && genreOk && dirOk && cntOk) {
-                                const fAvg = m[fAvgKey];
-                                const mAvg = m[mAvgKey];
-                                const score = computeScore(fAvg, fVotes, mAvg, mVotes);
-
-                                results.push({
-                                    id:    m.imdb_title_id,
-                                    title: m.title,
-                                    year:  m.year,
-                                    genres: m.genres.join(', '),
-                                    score,
-                                    fAvg,  fVotes,
-                                    mAvg,  mVotes,
-                                    gaze_delta: fAvg - mAvg,
-                                    // Optional column raw values
-                                    weighted_average_vote: m.weighted_average_vote,
-                                    total_votes:           m.total_votes,
-                                    director:              m.director,
-                                    country:               m.country,
-                                    duration:              m.duration,
-                                    metascore:             m.metascore,
-                                    budget:                m.budget,
-                                    usa_gross_income:      m.usa_gross_income,
-                                    worldwide_gross_income:m.worldwide_gross_income,
-                                });
-                            }
-                        }
-                        cursor.continue();
-                    } else {
+                    if (!cursor) {
                         state.currentData = results;
                         sortData();
                         renderTable();
                         resolve();
+                        return;
                     }
+
+                    const m = cursor.value;
+                    const { fAvg, fVotes, mAvg, mVotes } = aggregateDemographics(m, f.ageGroups);
+
+                    if (fAvg !== null && mAvg !== null && fVotes >= minV && mVotes >= minV) {
+                        const yearOk  = m.year && m.year >= f.yearFrom && m.year <= f.yearTo;
+                        const titleOk = !f.search   || (m.title    || '').toLowerCase().includes(f.search);
+                        const genreOk = f.genres.length === 0 || f.genres.some(g => m.genres.includes(g));
+                        const dirOk   = !f.director || (m.director || '').toLowerCase().includes(f.director);
+                        const cntOk   = !f.country  || (m.country  || '').toLowerCase().includes(f.country);
+                        const langOk  = !f.language || (m.language || '').toLowerCase().includes(f.language);
+
+                        if (yearOk && titleOk && genreOk && dirOk && cntOk && langOk) {
+                            results.push({
+                                id: m.imdb_title_id,
+                                title: m.title,
+                                year:  m.year,
+                                genres: m.genres.join(', '),
+                                score: computeScore(fAvg, fVotes, mAvg, mVotes),
+                                fAvg, fVotes, mAvg, mVotes,
+                                gaze_delta: fAvg - mAvg,
+                                weighted_average_vote: m.weighted_average_vote,
+                                total_votes:           m.total_votes,
+                                director:              m.director,
+                                country:               m.country,
+                                language:              m.language,
+                                duration:              m.duration,
+                                metascore:             m.metascore,
+                                budget:                m.budget,
+                                usa_gross_income:      m.usa_gross_income,
+                                worldwide_gross_income:m.worldwide_gross_income,
+                            });
+                        }
+                    }
+                    cursor.continue();
                 };
             }, 10);
         });
     }
 
     // --- Sorting ---
+    const SORT_KEY_MAP = {
+        title:           'title',
+        score:           'score',
+        female_avg:      'fAvg',
+        male_avg:        'mAvg',
+        gaze_delta:      'gaze_delta',
+        imdb_score:      'weighted_average_vote',
+        total_votes:     'total_votes',
+        director:        'director',
+        country:         'country',
+        language:        'language',
+        duration:        'duration',
+        metascore:       'metascore',
+        budget:          'budget',
+        usa_gross:       'usa_gross_income',
+        worldwide_gross: 'worldwide_gross_income',
+    };
+
     function sortData() {
-        const col  = state.sortCol;
+        const prop = SORT_KEY_MAP[state.sortCol] || state.sortCol;
         const dir  = state.sortDesc ? -1 : 1;
-
-        // Map column id → result property
-        const keyMap = {
-            title:                'title',
-            score:                'score',
-            female_avg:           'fAvg',
-            male_avg:             'mAvg',
-            gaze_delta:           'gaze_delta',
-            // extra columns
-            imdb_score:           'weighted_average_vote',
-            total_votes:          'total_votes',
-            director:             'director',
-            country:              'country',
-            duration:             'duration',
-            metascore:            'metascore',
-            budget:               'budget',
-            usa_gross:            'usa_gross_income',
-            worldwide_gross:      'worldwide_gross_income',
-        };
-
-        const prop = keyMap[col] || col;
 
         state.currentData.sort((a, b) => {
             let va = a[prop], vb = b[prop];
-            if (va === null || va === undefined) va = col === 'title' ? '' : -Infinity;
-            if (vb === null || vb === undefined) vb = col === 'title' ? '' : -Infinity;
+            if (va === null || va === undefined) va = state.sortCol === 'title' ? '' : -Infinity;
+            if (vb === null || vb === undefined) vb = state.sortCol === 'title' ? '' : -Infinity;
             if (typeof va === 'string') va = va.toLowerCase();
             if (typeof vb === 'string') vb = vb.toLowerCase();
-            if (va < vb) return -1 * dir;
-            if (va > vb) return  1 * dir;
-            return 0;
+            return va < vb ? -dir : va > vb ? dir : 0;
         });
 
         updateSortIcons();
@@ -424,61 +412,52 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateSortIcons() {
         document.querySelectorAll('th.sortable').forEach(th => {
             const icon = th.querySelector('.sort-icon');
-            if (!icon) return;
-            icon.innerHTML = th.dataset.sort === state.sortCol
-                ? (state.sortDesc ? '↓' : '↑')
-                : '';
+            if (icon) icon.textContent = th.dataset.sort === state.sortCol ? (state.sortDesc ? '↓' : '↑') : '';
         });
     }
 
     // --- Rendering ---
     function renderTable() {
-        const start    = (state.page - 1) * state.settings.pageSize;
-        const pageData = state.currentData.slice(start, start + state.settings.pageSize);
+        const start      = (state.page - 1) * state.settings.pageSize;
+        const pageData   = state.currentData.slice(start, start + state.settings.pageSize);
+        const activeCols = EXTRA_COLUMN_DEFS.filter(c => state.settings.extraColumns.includes(c.id));
 
-        ui.resultsCount.textContent = `${state.currentData.length.toLocaleString()} results`;
+        ui.resultsCount.textContent = t('results.count', { n: state.currentData.length.toLocaleString() });
+
+        // Score column label reflects balance mode
+        if (ui.scoreColLabel) {
+            ui.scoreColLabel.dataset.i18n = state.settings.balancedGenders ? 'col.scoreBalanced' : 'col.score';
+            ui.scoreColLabel.textContent  = t(ui.scoreColLabel.dataset.i18n);
+        }
 
         // Sync extra column headers
         const thead = document.querySelector('#movies-table thead tr');
         thead.querySelectorAll('.extra-header').forEach(el => el.remove());
-
-        const activeCols = EXTRA_COLUMN_DEFS.filter(c => state.settings.extraColumns.includes(c.id));
         activeCols.forEach(col => {
             const th = document.createElement('th');
             th.className = 'sortable extra-header';
             th.dataset.sort = col.id;
-            th.innerHTML = `${col.label} <span class="sort-icon"></span>`;
+            th.innerHTML = `${t(col.labelKey)} <span class="sort-icon"></span>`;
             th.addEventListener('click', () => handleSort(col.id));
             thead.appendChild(th);
         });
-
-        // Update score column header label to reflect balance mode
-        const scoreTh = thead.querySelector('[data-sort="score"]');
-        if (scoreTh) {
-            const icon = scoreTh.querySelector('.sort-icon');
-            const iconHtml = icon ? icon.outerHTML : '<span class="sort-icon"></span>';
-            scoreTh.innerHTML = (state.settings.balancedGenders ? 'Score ⚖' : 'Score') + ' ' + iconHtml;
-        }
 
         ui.tableBody.innerHTML = '';
 
         if (pageData.length === 0) {
             const colspan = 6 + activeCols.length;
-            ui.tableBody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">No movies found. Try adjusting the filters or lowering minimum votes.</td></tr>`;
+            ui.tableBody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">${t('table.empty')}</td></tr>`;
             updatePagination();
             return;
         }
 
         const fragment = document.createDocumentFragment();
-
         pageData.forEach((m, idx) => {
             const tr = document.createElement('tr');
-
             const delta = m.gaze_delta;
-            if (delta >= state.settings.gazeThreshold)
-                tr.classList.add('row-female-gaze');
-            else if (delta <= -state.settings.gazeThreshold)
-                tr.classList.add('row-male-gaze');
+
+            if (delta >= state.settings.gazeThreshold) tr.classList.add('row-female-gaze');
+            else if (delta <= -state.settings.gazeThreshold) tr.classList.add('row-male-gaze');
 
             const rank    = start + idx + 1;
             const yearStr = m.year ? ` (${m.year})` : '';
@@ -491,14 +470,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="genres-text">${m.genres}</span>
                 </td>
                 <td class="score">${m.score.toFixed(2)}</td>
-                <td><span class="female-val">${m.fAvg.toFixed(1)}</span><br><span class="vote-count">${m.fVotes.toLocaleString()} votes</span></td>
-                <td><span class="male-val">${m.mAvg.toFixed(1)}</span><br><span class="vote-count">${m.mVotes.toLocaleString()} votes</span></td>
+                <td><span class="female-val">${m.fAvg.toFixed(1)}</span><br><span class="vote-count">${m.fVotes.toLocaleString()}</span></td>
+                <td><span class="male-val">${m.mAvg.toFixed(1)}</span><br><span class="vote-count">${m.mVotes.toLocaleString()}</span></td>
                 <td class="delta-val">${deltaStr}</td>
             `;
 
-            activeCols.forEach(col => {
-                html += `<td>${fmtCell(m[col.key], col.fmt)}</td>`;
-            });
+            activeCols.forEach(col => { html += `<td>${fmtCell(m[col.key], col.fmt)}</td>`; });
 
             tr.innerHTML = html;
             fragment.appendChild(tr);
@@ -511,33 +488,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updatePagination() {
         const totalPages = Math.max(1, Math.ceil(state.currentData.length / state.settings.pageSize));
-        ui.pageInfo.textContent = `Page ${state.page} of ${totalPages}`;
+        ui.pageInfo.textContent = t('page.info', { page: state.page, total: totalPages });
         ui.prevPageBtn.disabled = state.page === 1;
         ui.nextPageBtn.disabled = state.page === totalPages;
     }
 
     function handleSort(col) {
-        if (state.sortCol === col) {
-            state.sortDesc = !state.sortDesc;
-        } else {
-            state.sortCol  = col;
-            state.sortDesc = col !== 'title';
-        }
+        state.sortDesc = state.sortCol === col ? !state.sortDesc : col !== 'title';
+        state.sortCol  = col;
         sortData();
         renderTable();
     }
 
-    // --- Event Binding ---
+    // --- Events ---
     function bindEvents() {
         ui.applyBtn.addEventListener('click', applyFiltersAndFetch);
 
         ui.resetBtn.addEventListener('click', () => {
-            ui.searchInput.value  = '';
+            ui.searchInput.value   = '';
             ui.yearFromInput.value = '1894';
             ui.yearToInput.value   = new Date().getFullYear();
-            ui.ageRadios[0].checked = true;
-            document.querySelectorAll('.genre-cb').forEach(cb => cb.checked = false);
-            // Reset extra filter inputs
+            document.querySelectorAll('input[name="age-group"]').forEach(cb => { cb.checked = false; });
+            document.querySelectorAll('.genre-cb').forEach(cb => { cb.checked = false; });
             EXTRA_FILTER_DEFS.forEach(def => {
                 const input = document.getElementById(def.inputId);
                 if (input) input.value = '';
@@ -545,22 +517,25 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFiltersAndFetch();
         });
 
-        // Sort on static headers
-        ui.sortHeaders.forEach(th => {
+        document.querySelectorAll('th.sortable').forEach(th => {
             th.addEventListener('click', () => handleSort(th.dataset.sort));
         });
 
-        ui.prevPageBtn.addEventListener('click', () => {
-            if (state.page > 1) { state.page--; renderTable(); }
-        });
+        ui.prevPageBtn.addEventListener('click', () => { if (state.page > 1) { state.page--; renderTable(); } });
         ui.nextPageBtn.addEventListener('click', () => {
             const total = Math.ceil(state.currentData.length / state.settings.pageSize);
             if (state.page < total) { state.page++; renderTable(); }
         });
 
-        // Settings modal
+        ui.langToggle.addEventListener('click', () => {
+            state.settings.language = state.settings.language === 'en' ? 'fi' : 'en';
+            saveSettings();
+            applyI18n();
+            renderTable();
+        });
+
         ui.settingsBtn.addEventListener('click', () => {
-            applySettingsToUI(); // sync UI to current state before opening
+            applySettingsToUI();
             ui.settingsModal.classList.add('show');
         });
         ui.closeModal.addEventListener('click', () => ui.settingsModal.classList.remove('show'));
@@ -572,12 +547,11 @@ document.addEventListener('DOMContentLoaded', () => {
             readSettingsFromUI();
             saveSettings();
             updateExtraFilterVisibility();
+            applyI18n();
             ui.settingsModal.classList.remove('show');
-            // Score computation and visible columns may have changed — re-filter fully
             applyFiltersAndFetch();
         });
     }
 
-    // --- Start ---
     init();
 });

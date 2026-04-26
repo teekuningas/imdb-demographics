@@ -23,6 +23,12 @@
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
 body {
     font-family: var(--font-family);
     background-color: var(--bg);
@@ -98,22 +104,6 @@ h1, h2, h3 { color: var(--primary); }
     gap: 8px;
 }
 .year-group > div { flex: 1; }
-
-.radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    font-size: 0.88rem;
-}
-.radio-group label {
-    font-weight: normal;
-    text-transform: none;
-    letter-spacing: 0;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    cursor: pointer;
-}
 
 .checkbox-grid {
     display: grid;
@@ -289,7 +279,7 @@ tr:hover td { background-color: #f8fafc; }
     gap: 16px;
     flex-shrink: 0;
 }
-.pagination button { max-width: 90px; flex: none; }
+.pagination button { flex: none; white-space: nowrap; }
 #page-info { font-size: 0.85rem; color: var(--text-muted); min-width: 100px; text-align: center; }
 
 /* ─── Loading Overlay ─────────────────────────────────── */

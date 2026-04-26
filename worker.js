@@ -3,7 +3,7 @@
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js');
 
 const DB_NAME = 'spectacleDB';
-const DB_VERSION = 7;
+const DB_VERSION = 9;
 const STORE_NAME = 'movies';
 
 // --- IndexedDB Helper Functions ---
@@ -57,6 +57,12 @@ function parseUSD(str) {
     return isNaN(n) ? null : n;
 }
 
+// Normalise CSV "None" and blank strings to null.
+function csvStr(val) {
+    if (!val || val.trim() === 'None') return null;
+    return val.trim();
+}
+
 // --- Data Ingestion ---
 async function ingestData() {
     try {
@@ -93,12 +99,12 @@ async function ingestData() {
                         title,
                         year: isNaN(year) ? null : year,
                         genres,
-                        director: row.director ? row.director.trim() : null,
-                        country: row.country ? row.country.trim() : null,
+                        director: csvStr(row.director),
+                        country:  csvStr(row.country),
+                        language: csvStr(row.language),
                         duration: parseInt(row.duration) || null,
-                        budget: parseUSD(row.budget),
-                        usa_gross_income: parseUSD(row.usa_gross_income),
-                        // Note: CSV has a typo "worlwide_gross_income"
+                        budget:              parseUSD(row.budget),
+                        usa_gross_income:    parseUSD(row.usa_gross_income),
                         worldwide_gross_income: parseUSD(row.worlwide_gross_income),
                         metascore: parseFloat(row.metascore) || null,
                     });
@@ -127,52 +133,42 @@ async function ingestData() {
                     const meta = moviesMeta.get(id);
                     if (!meta) return;
 
-                    // Build a clean, explicit record — no spread of raw CSV row.
-                    // Only include fields we actually use to keep IndexedDB lean.
                     const record = {
-                        // --- Identity & metadata ---
                         imdb_title_id: id,
-                        title: meta.title,
-                        year: meta.year,
-                        genres: meta.genres,
-                        director: meta.director,
-                        country: meta.country,
-                        duration: meta.duration,
-                        budget: meta.budget,
-                        usa_gross_income: meta.usa_gross_income,
+                        title:    meta.title,
+                        year:     meta.year,
+                        genres:   meta.genres,
+                        director:  meta.director,
+                        country:   meta.country,
+                        language:  meta.language,
+                        duration:  meta.duration,
+                        budget:    meta.budget,
+                        usa_gross_income:       meta.usa_gross_income,
                         worldwide_gross_income: meta.worldwide_gross_income,
                         metascore: meta.metascore,
 
-                        // --- Overall ratings ---
                         weighted_average_vote: row.weighted_average_vote,
-                        total_votes: row.total_votes,
+                        total_votes:           row.total_votes,
 
-                        // --- Gender × Age demographic ratings (the core data) ---
-                        // allages
-                        males_allages_avg_vote:    row.males_allages_avg_vote,
-                        males_allages_votes:        row.males_allages_votes,
-                        females_allages_avg_vote:   row.females_allages_avg_vote,
-                        females_allages_votes:      row.females_allages_votes,
-                        // <18
-                        males_0age_avg_vote:        row.males_0age_avg_vote,
-                        males_0age_votes:           row.males_0age_votes,
-                        females_0age_avg_vote:      row.females_0age_avg_vote,
-                        females_0age_votes:         row.females_0age_votes,
-                        // 18-29
-                        males_18age_avg_vote:       row.males_18age_avg_vote,
-                        males_18age_votes:          row.males_18age_votes,
-                        females_18age_avg_vote:     row.females_18age_avg_vote,
-                        females_18age_votes:        row.females_18age_votes,
-                        // 30-44
-                        males_30age_avg_vote:       row.males_30age_avg_vote,
-                        males_30age_votes:          row.males_30age_votes,
-                        females_30age_avg_vote:     row.females_30age_avg_vote,
-                        females_30age_votes:        row.females_30age_votes,
-                        // 45+
-                        males_45age_avg_vote:       row.males_45age_avg_vote,
-                        males_45age_votes:          row.males_45age_votes,
-                        females_45age_avg_vote:     row.females_45age_avg_vote,
-                        females_45age_votes:        row.females_45age_votes,
+                        males_0age_avg_vote:       row.males_0age_avg_vote,
+                        males_0age_votes:          row.males_0age_votes,
+                        females_0age_avg_vote:     row.females_0age_avg_vote,
+                        females_0age_votes:        row.females_0age_votes,
+
+                        males_18age_avg_vote:      row.males_18age_avg_vote,
+                        males_18age_votes:         row.males_18age_votes,
+                        females_18age_avg_vote:    row.females_18age_avg_vote,
+                        females_18age_votes:       row.females_18age_votes,
+
+                        males_30age_avg_vote:      row.males_30age_avg_vote,
+                        males_30age_votes:         row.males_30age_votes,
+                        females_30age_avg_vote:    row.females_30age_avg_vote,
+                        females_30age_votes:       row.females_30age_votes,
+
+                        males_45age_avg_vote:      row.males_45age_avg_vote,
+                        males_45age_votes:         row.males_45age_votes,
+                        females_45age_avg_vote:    row.females_45age_avg_vote,
+                        females_45age_votes:       row.females_45age_votes,
                     };
 
                     batch.push(record);
