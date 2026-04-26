@@ -1,37 +1,40 @@
 # Project Plan: IMDb Demographics & Dataset Explorer
 
-## Current State of the Codebase
-- **Architecture:** Server-side rendered (SSR) Python application (`server.py`).
-- **Data Handling:** Loads `movies.csv` (47MB) and `ratings.csv` (17MB) into memory.
-- **UI:** Full page reload on every filter change. Hardcoded logic.
-
-## Vision: The Curated Demographics Explorer (Client-Side SPA)
-Transform the tool into a fast, elegant **Single Page Application** that runs entirely in the browser using IndexedDB for caching. The UX will be carefully curated to handle the massive dimensionality of the dataset without overwhelming the user.
+## Vision: The Curated Spectacle (Client-Side SPA)
+Transform the tool into a fast, elegant, and surprisingly powerful **Single Page Application**. It will run entirely in the browser using IndexedDB for caching. The UX will be carefully curated to handle the massive dimensionality of both `movies.csv` and `ratings.csv` without overwhelming the user. It should feel like a premium, specialized data explorer rather than a raw data dump.
 
 ### 1. Data Mapping & The "Dynamic Demographic" Pattern
-The `ratings.csv` contains 49 columns (e.g., `males_18age_avg_vote`, `females_45age_avg_vote`). Instead of treating these as 49 separate table columns, we will map them to a **Demographic Segment Controller** in the UI.
+The dataset contains dozens of columns (e.g., `males_18age_avg_vote`, `females_45age_avg_vote`, `budget`, `usa_gross_income`, `reviews_from_critics`). Instead of treating these as separate, chaotic table columns, we map them to an elegant UI.
 
 **Sidebar Controls (Global Filters):**
 - **Title Search:** Text input.
 - **Minimum Votes:** Default 1000. Applies to the *selected* demographic to ensure statistical significance.
 - **Year Range:** Min/Max inputs.
 - **Genres:** Multi-select checkboxes.
-- **Age Group:** Radio buttons (`All Ages`, `<18`, `18-29`, `30-44`, `45+`). *This dynamically dictates which raw columns populate the table.*
+- **Age Group:** Radio buttons (`All Ages`, `<18`, `18-29`, `30-44`, `45+`). *This dynamically dictates which raw demographic columns populate the table.*
 
 **Table Columns (The Curated View):**
 1. **Rank:** Numerical index.
 2. **Title (Year) & Genres:** Basic metadata.
 3. **IMDb Weighted Avg:** The official, algorithmically smoothed IMDb score.
 4. **Balanced Avg:** `(Selected Female Avg + Selected Male Avg) / 2`.
-5. **Female Avg:** dynamically pulls from `females_Xage_avg_vote` based on the Age Group filter.
-6. **Male Avg:** dynamically pulls from `males_Xage_avg_vote` based on the Age Group filter.
-7. **Gaze Delta:** `Female Avg - Male Avg`. (Color-coded: Red for female-skewed, Blue for male-skewed).
+5. **Female Avg:** Dynamically pulls from `females_Xage_avg_vote` based on the Age Group filter.
+6. **Male Avg:** Dynamically pulls from `males_Xage_avg_vote` based on the Age Group filter.
+7. **Gaze Delta:** `Female Avg - Male Avg`. 
 
-### 2. What is "Weighted Average Vote"?
-IMDb doesn't just calculate a raw mean (sum of votes / number of votes) because a movie with a single 10/10 vote would rank higher than a masterpiece with 500,000 9/10 votes. The "Weighted Average" uses a Bayesian estimator to smooth out extreme outliers, penalize "review bombing," and give more weight to accounts of regular voters. It represents the "official" score.
+### 2. Gaze Delta & Visual Highlighting
+To emphasize the "Male vs. Female Gaze" premise, the **Gaze Delta** column will be color-coded. 
+- **Red/Pink tint:** If `Female Avg - Male Avg >= 0.5` (Female Gaze).
+- **Blue tint:** If `Male Avg - Female Avg >= 0.5` (Male Gaze).
+- Neutral/Subtle: If the difference is `< 0.5`.
 
-### 3. Implementation Phases
-- **Phase 1: Architecture & Ingestion.** Setup static `index.html`, `app.js`, and `style.css`. Build the UI to fetch the CSVs from GitHub, parse them via PapaParse, and store them in IndexedDB.
-- **Phase 2: The Core Engine.** Implement the filtering, reversible sorting, and pagination (rendering 100/200/500 rows at a time out of the 85,000).
-- **Phase 3: UX Polish.** Implement the Demographic Segment Controller so changing the "Age" filter instantly recalculates the Balanced Avg and Gaze Delta columns using the correct raw data subset. Ensure mobile responsiveness.
+### 3. "Settings" and Advanced Data Visibility
+To respect the philosophy of "as much data as possible without ruining the UX", we will introduce a **Settings / Column Visibility Menu**. 
+- Users can tweak thresholds (e.g., changing the Gaze Delta highlight threshold from `0.5` to something else).
+- Users can toggle the visibility of "Extra" columns derived from `movies.csv` and `ratings.csv` that are hidden by default (e.g., `Duration`, `Budget`, `USA Gross Income`, `Metascore`, `Reviews from Critics`, `US vs. Non-US Voters`).
+- This allows power users to cross-reference demographic gaze with commercial success or critical acclaim without cluttering the default view.
 
+### 4. Implementation Phases
+- **Phase 1: Architecture & Ingestion.** Setup static `index.html`, `app.js`, and `style.css`. Build the UI to fetch the CSVs from GitHub, parse them via PapaParse in a Web Worker, and store them in IndexedDB.
+- **Phase 2: The Core Engine.** Implement the filtering, reversible sorting on all columns, and pagination (rendering 100/200/500 rows at a time out of the 85,000).
+- **Phase 3: The Curated UX & Settings.** Implement the Dynamic Demographic segment controller (Age Group), the color-coded Gaze Delta, and the Settings menu for column visibility and threshold tuning. Ensure mobile responsiveness.
